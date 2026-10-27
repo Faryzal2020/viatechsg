@@ -31,5 +31,27 @@ export function initDatabase(): void {
     );
   `);
 
+  // Migration: Automatically add any missing columns if table was created in an older version
+  const tableInfo = db.prepare('PRAGMA table_info(submissions)').all() as unknown as { name: string }[];
+  const existingCols = new Set(tableInfo.map((col) => col.name));
+
+  const requiredColumns = [
+    { name: 'first_name', definition: 'TEXT NOT NULL DEFAULT ""' },
+    { name: 'last_name', definition: 'TEXT NOT NULL DEFAULT ""' },
+    { name: 'email', definition: 'TEXT NOT NULL DEFAULT ""' },
+    { name: 'company', definition: 'TEXT' },
+    { name: 'country', definition: 'TEXT' },
+    { name: 'phone_number', definition: 'TEXT' },
+    { name: 'notes', definition: 'TEXT' },
+    { name: 'raw_payload', definition: 'TEXT' },
+  ];
+
+  for (const col of requiredColumns) {
+    if (!existingCols.has(col.name)) {
+      console.log(`[Database Migration] Adding missing column: ${col.name}`);
+      db.exec(`ALTER TABLE submissions ADD COLUMN ${col.name} ${col.definition};`);
+    }
+  }
+
   console.log(`[Database] Initialized SQLite database at ${config.dbPath}`);
 }
