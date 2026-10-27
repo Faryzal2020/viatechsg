@@ -80,6 +80,29 @@ npm run build
 npm start
 ```
 
+### 3. Production Deployment with PM2
+First build the TypeScript source:
+```bash
+npm run build
+```
+
+Then manage the process with PM2:
+```bash
+# Start with PM2
+npx pm2 start ecosystem.config.cjs
+
+# Or using the npm scripts:
+npm run pm2:start
+
+# View status & logs
+npx pm2 status
+npm run pm2:logs
+
+# Restart or stop
+npm run pm2:restart
+npm run pm2:stop
+```
+
 ---
 
 ## 📡 API Endpoints
