@@ -31,9 +31,19 @@ export function initDatabase(): void {
     );
   `);
 
-  // Migration: Automatically add any missing columns if table was created in an older version
+  // Migration: Automatically handle legacy table schemas
   const tableInfo = db.prepare('PRAGMA table_info(submissions)').all() as unknown as { name: string }[];
   const existingCols = new Set(tableInfo.map((col) => col.name));
+
+  // If the legacy 'payload' column from version 1 exists with NOT NULL constraint, drop it
+  if (existingCols.has('payload')) {
+    console.log('[Database Migration] Dropping legacy payload NOT NULL column...');
+    try {
+      db.exec('ALTER TABLE submissions DROP COLUMN payload;');
+    } catch (err) {
+      console.warn('[Database Migration] Notice while dropping legacy payload column:', err);
+    }
+  }
 
   const requiredColumns = [
     { name: 'first_name', definition: 'TEXT NOT NULL DEFAULT ""' },
