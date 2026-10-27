@@ -88,36 +88,48 @@ npm start
 - **Method:** `POST`
 - **Path:** `/api/submissions` (or `/submit`)
 - **Headers:** `Content-Type: application/json`
-- **Body:** Any JSON object (fields can be arbitrary and will be dynamically stored and emailed)
+
+#### Form Fields:
+| Field | Type | Required | Allowed Key Names |
+| :--- | :--- | :--- | :--- |
+| **First Name** | `string` | **Yes** | `firstName`, `first_name`, `"first name"` |
+| **Last Name** | `string` | **Yes** | `lastName`, `last_name`, `"last name"` |
+| **Email Address** | `string` | **Yes** | `email`, `emailAddress`, `email_address`, `"email adress"` |
+| **Company** | `string` | No | `company`, `companyName`, `company_name` |
+| **Country** | `string` | No | `country` |
+| **Phone Number** | `string` | No | `phoneNumber`, `phone_number`, `phone`, `"phone number"` |
+| **Notes** | `string` | No | `notes`, `note`, `message`, `comment` |
 
 **Example Request:**
 ```bash
-curl -X POST http://localhost:3000/api/submissions \
+curl -X POST http://localhost:3010/api/submissions \
   -H "Content-Type: application/json" \
   -d '{
-    "fullName": "Jane Doe",
-    "email": "jane@example.com",
-    "phone": "+1-555-0199",
-    "service": "Consulting",
-    "message": "Looking for custom backend development."
+    "firstName": "John",
+    "lastName": "Smith",
+    "email": "john.smith@viatech.sg",
+    "company": "Viatech SG",
+    "country": "Singapore",
+    "phoneNumber": "+65 9123 4567",
+    "notes": "Looking forward to discussing backend integration."
   }'
 ```
 
-**Example Response:**
+**Example Response (201 Created):**
 ```json
 {
   "success": true,
   "message": "Submission received and saved successfully.",
   "submission": {
     "id": 1,
-    "createdAt": "2026-10-27 14:20:36",
-    "payload": {
-      "fullName": "Jane Doe",
-      "email": "jane@example.com",
-      "phone": "+1-555-0199",
-      "service": "Consulting",
-      "message": "Looking for custom backend development."
-    }
+    "firstName": "John",
+    "lastName": "Smith",
+    "email": "john.smith@viatech.sg",
+    "company": "Viatech SG",
+    "country": "Singapore",
+    "phoneNumber": "+65 9123 4567",
+    "notes": "Looking forward to discussing backend integration.",
+    "createdAt": "2026-10-27 14:33:41"
   },
   "email": {
     "sent": true,

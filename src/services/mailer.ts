@@ -30,28 +30,53 @@ export function getTransporter(): Transporter | null {
 }
 
 /**
- * Generates an HTML table from any submitted key-value payload.
+ * Generates an HTML notification email with the submitted contact details.
  */
 function buildHtmlBody(submission: SubmissionRecord): string {
-  const entries = Object.entries(submission.payload);
+  const fields = [
+    { label: 'First Name', value: submission.firstName },
+    { label: 'Last Name', value: submission.lastName },
+    {
+      label: 'Email Address',
+      value: `<a href="mailto:${escapeHtml(submission.email)}" style="color: #2563eb; text-decoration: none;">${escapeHtml(submission.email)}</a>`,
+      isHtml: true,
+    },
+    { label: 'Company', value: submission.company || '-' },
+    { label: 'Country', value: submission.country || '-' },
+    {
+      label: 'Phone Number',
+      value: submission.phoneNumber
+        ? `<a href="tel:${escapeHtml(submission.phoneNumber)}" style="color: #2563eb; text-decoration: none;">${escapeHtml(submission.phoneNumber)}</a>`
+        : '-',
+      isHtml: true,
+    },
+  ];
 
-  const rows = entries.map(([key, value]) => {
-    const formattedValue =
-      typeof value === 'object' && value !== null
-        ? `<pre style="margin:0; font-family: monospace;">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`
-        : escapeHtml(String(value ?? ''));
-
-    return `
+  const rowsHtml = fields
+    .map(
+      (f) => `
       <tr>
-        <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #334155; width: 35%; background: #f8fafc;">
-          ${escapeHtml(key)}
+        <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #475569; width: 35%; background: #f8fafc;">
+          ${escapeHtml(f.label)}
         </td>
         <td style="padding: 10px 14px; border-bottom: 1px solid #e2e8f0; color: #0f172a;">
-          ${formattedValue}
+          ${f.isHtml ? f.value : escapeHtml(f.value)}
         </td>
       </tr>
-    `;
-  }).join('');
+    `
+    )
+    .join('');
+
+  const notesHtml = submission.notes
+    ? `
+      <div style="margin-top: 20px;">
+        <h4 style="margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Notes / Message</h4>
+        <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; border-radius: 4px; color: #1e293b; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">
+          ${escapeHtml(submission.notes)}
+        </div>
+      </div>
+    `
+    : '';
 
   return `
     <!DOCTYPE html>
@@ -61,17 +86,20 @@ function buildHtmlBody(submission: SubmissionRecord): string {
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; padding: 24px; margin: 0;">
         <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-          <div style="background: #2563eb; padding: 18px 24px; color: #ffffff;">
+          <div style="background: #2563eb; padding: 20px 24px; color: #ffffff;">
             <h2 style="margin: 0; font-size: 20px; font-weight: 600;">${escapeHtml(config.email.subject)}</h2>
-            <p style="margin: 4px 0 0; font-size: 13px; opacity: 0.9;">Submission #${submission.id} &bull; Received at ${escapeHtml(submission.createdAt)}</p>
+            <p style="margin: 6px 0 0; font-size: 13px; opacity: 0.9;">
+              Submission #${submission.id} &bull; Received at ${escapeHtml(submission.createdAt)}
+            </p>
           </div>
           <div style="padding: 24px;">
             <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
-              ${rows || '<tr><td style="padding: 12px; color: #64748b;">(Empty submission payload)</td></tr>'}
+              ${rowsHtml}
             </table>
+            ${notesHtml}
           </div>
           <div style="background: #f8fafc; padding: 12px 24px; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; text-align: center;">
-            Sent by your automated backend notification service.
+            Sent automatically by your backend notification service.
           </div>
         </div>
       </body>
@@ -83,17 +111,20 @@ function buildHtmlBody(submission: SubmissionRecord): string {
  * Generates plain-text fallback representation.
  */
 function buildTextBody(submission: SubmissionRecord): string {
-  const lines = Object.entries(submission.payload).map(([k, v]) => {
-    const val = typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v ?? '');
-    return `${k}: ${val}`;
-  });
-
   return [
     `=== ${config.email.subject} ===`,
     `ID: ${submission.id}`,
-    `Created: ${submission.createdAt}`,
+    `Created At: ${submission.createdAt}`,
     '----------------------------------------',
-    ...lines,
+    `First Name:   ${submission.firstName}`,
+    `Last Name:    ${submission.lastName}`,
+    `Email:        ${submission.email}`,
+    `Company:      ${submission.company || '-'}`,
+    `Country:      ${submission.country || '-'}`,
+    `Phone Number: ${submission.phoneNumber || '-'}`,
+    '----------------------------------------',
+    'Notes:',
+    submission.notes || '(No notes provided)',
     '----------------------------------------',
   ].join('\n');
 }
@@ -135,7 +166,7 @@ export async function sendSubmissionEmail(submission: SubmissionRecord): Promise
     const info = await mailTransporter.sendMail({
       from: config.email.from,
       to: config.email.to,
-      subject: `${config.email.subject} [#${submission.id}]`,
+      subject: `${config.email.subject} [#${submission.id} - ${submission.firstName} ${submission.lastName}]`,
       text: buildTextBody(submission),
       html: buildHtmlBody(submission),
     });

@@ -15,12 +15,18 @@ export function initDatabase(): void {
   // WAL mode for fast concurrency and reliability
   db.exec('PRAGMA journal_mode = WAL;');
 
-  // Schema: 'payload' stores whatever fields you submit as JSON.
-  // When you finalize your fields, you can either keep payload JSON or add explicit columns!
+  // Schema with explicit columns for submissions
   db.exec(`
     CREATE TABLE IF NOT EXISTS submissions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      payload TEXT NOT NULL,
+      first_name TEXT NOT NULL,
+      last_name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      company TEXT,
+      country TEXT,
+      phone_number TEXT,
+      notes TEXT,
+      raw_payload TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
   `);

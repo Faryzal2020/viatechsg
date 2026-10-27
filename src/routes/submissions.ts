@@ -1,29 +1,66 @@
 import { Router, Request, Response } from 'express';
-import { saveSubmission, getSubmissionById, listSubmissions } from '../db/submissions.js';
+import {
+  saveSubmission,
+  getSubmissionById,
+  listSubmissions,
+  normalizeSubmissionInput,
+} from '../db/submissions.js';
 import { sendSubmissionEmail } from '../services/mailer.js';
 
 export const submissionsRouter = Router();
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
  * Main POST endpoint to receive submission data.
- * The payload fields can be anything - they will be preserved and saved to SQLite,
- * then formatted into an email notification.
+ * Expected fields:
+ * - first name (firstName / first_name)
+ * - last name  (lastName / last_name)
+ * - email address (email / emailAddress / email_address)
+ * - company
+ * - country
+ * - phone number (phoneNumber / phone_number / phone)
+ * - notes
  */
 submissionsRouter.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const payload = req.body;
+    const rawBody = req.body;
 
-    // Basic validation: ensure body is a non-empty object
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).length === 0) {
+    if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody) || Object.keys(rawBody).length === 0) {
       res.status(400).json({
         success: false,
-        error: 'Invalid request body. Expected a non-empty JSON object with your submission fields.',
+        error: 'Invalid request body. Expected a non-empty JSON object.',
+      });
+      return;
+    }
+
+    const input = normalizeSubmissionInput(rawBody);
+
+    // Validation
+    const errors: string[] = [];
+    if (!input.firstName) {
+      errors.push('first name is required');
+    }
+    if (!input.lastName) {
+      errors.push('last name is required');
+    }
+    if (!input.email) {
+      errors.push('email address is required');
+    } else if (!EMAIL_REGEX.test(input.email)) {
+      errors.push('email address must be a valid email format');
+    }
+
+    if (errors.length > 0) {
+      res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors,
       });
       return;
     }
 
     // 1. Save data to SQLite database
-    const savedSubmission = saveSubmission(payload);
+    const savedSubmission = saveSubmission(input);
 
     // 2. Send email notification (configured via .env)
     const emailResult = await sendSubmissionEmail(savedSubmission);
@@ -32,11 +69,7 @@ submissionsRouter.post('/', async (req: Request, res: Response): Promise<void> =
     res.status(201).json({
       success: true,
       message: 'Submission received and saved successfully.',
-      submission: {
-        id: savedSubmission.id,
-        createdAt: savedSubmission.createdAt,
-        payload: savedSubmission.payload,
-      },
+      submission: savedSubmission,
       email: {
         sent: emailResult.success,
         skipped: emailResult.skipped ?? false,
@@ -55,7 +88,7 @@ submissionsRouter.post('/', async (req: Request, res: Response): Promise<void> =
 });
 
 /**
- * Optional helper: Retrieve a specific submission by ID
+ * Helper: Retrieve a specific submission by ID
  */
 submissionsRouter.get('/:id', (req: Request, res: Response): void => {
   const idRaw = req.params.id;
@@ -76,7 +109,7 @@ submissionsRouter.get('/:id', (req: Request, res: Response): void => {
 });
 
 /**
- * Optional helper: List recent submissions
+ * Helper: List recent submissions
  */
 submissionsRouter.get('/', (req: Request, res: Response): void => {
   const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
